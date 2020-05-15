@@ -1,0 +1,23 @@
+
+version: 0.2
+
+env:
+  variables:
+    REPOSITORY_URI: ""
+
+phases:
+  pre_build:
+    commands:
+    - export REPOSITORY_URI="$(echo $CODEBUILD_BUILD_ARN | cut -f 5 -d ':').dkr.ecr.eu-west-1.amazonaws.com/alpine/suricata"
+    - echo Logging in to Amazon ECR...
+    - aws --version
+    - $(aws ecr get-login --region eu-west-1 --no-include-email)
+  build:
+    commands:
+      - docker load --input suricata-docker-save.tar
+      - export SURICATA_VERSION="$(docker run --entrypoint="/usr/bin/suricata" $REPOSITORY_URI:latest -V | awk '{print $5}')"
+  post_build:
+    commands:
+      - echo Uploading docker images to ECR
+      - docker push $REPOSITORY_URI:latest
+      - docker push "$REPOSITORY_URI:${SURICATA_VERSION}" 

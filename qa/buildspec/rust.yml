@@ -1,0 +1,29 @@
+version: 0.2
+
+env:
+  variables:
+    BUILD_CORES: "4"
+    LIBHTP_BRANCH: "0.5.x"
+    CFLAGS: "-Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function"
+    EXTRA_CFLAGS: ""
+    ARGS: "--enable-rust-strict"
+    ALLOW_FAILURE: "1"
+
+phases:
+  pre_build:
+    commands:
+      - export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}" && export BUILD_CORES=$(nproc)
+      - git clone --depth 1 https://github.com/OISF/libhtp -b ${LIBHTP_BRANCH}
+      - |
+        ./autogen.sh
+        ./configure --enable-unittests \
+              --enable-debug \
+              --enable-lua \
+              --enable-geoip \
+              --enable-profiling \
+              --enable-profiling-locks \
+              ${ARGS}
+  build:
+    commands:
+      - cd rust
+      - cargo clippy; RETURN=$?; if [ $RETURN -gt 0 ] && [ $ALLOW_FAILURE == "1" ]; then echo "Clippy failed with exit code ${RETURN}. You should probably check out the erros!"; elif [ $RETURN -gt 0 ] && [ $ALLOW_FAILURE == "0" ]; then exit $RETURN; fi

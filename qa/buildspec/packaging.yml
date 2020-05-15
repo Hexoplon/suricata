@@ -1,0 +1,41 @@
+
+version: 0.2
+
+env:
+  variables:
+    BUILD_CORES: "4"
+    LIBHTP_BRANCH: "0.5.x"
+
+phases:
+  pre_build:
+    commands:
+      - echo Downloading source code
+      - export BUILD_CORES=$(nproc)
+      - git clone --depth 1 https://github.com/OISF/libhtp -b ${LIBHTP_BRANCH}
+      - |
+          cd suricata-update
+          curl -L \
+              https://github.com/OISF/suricata-update/archive/master.tar.gz | \
+              tar zxvf - --strip-components=1
+      - cd ..
+      - echo Generating build files
+      - ./autogen.sh
+      - echo Configuring the make and make install
+      - ./configure --disable-gccmarch-native --prefix=/usr --sysconfdir=/etc --localstatedir=/var
+  build:
+    commands:
+      - echo Running install
+      - echo CPU count ${BUILD_CORES}
+      - make -j${BUILD_CORES}
+      - make install DESTDIR=${CODEBUILD_SRC_DIR}/rpm
+      - make install-conf DESTDIR=${CODEBUILD_SRC_DIR}/rpm
+  post_build:
+    commands:
+      - echo Packaging application
+      - export SURICATA_VERSION="$(LD_LIBRARY_PATH=${CODEBUILD_SRC_DIR}/rpm/usr/lib64 ${CODEBUILD_SRC_DIR}/rpm/usr/bin/suricata -V | awk '{print $5}' | awk '{$1=$1};1')"
+      - fpm -s dir -t rpm -n suricata -v "${SURICATA_VERSION}" -p "suricata-${SURICATA_VERSION}.rpm" -d "libnet-devel > 0" -d "jansson-devel > 0" -d "nss-devel > 0" -C "${CODEBUILD_SRC_DIR}/rpm" usr/ var/ etc/
+artifacts:
+  files:
+    - 'suricata-${SURICATA_VERSION}.rpm'
+
+  discard-paths: yes 
