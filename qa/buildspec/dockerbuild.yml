@@ -1,0 +1,32 @@
+
+version: 0.2
+
+env:
+  variables:
+    LIBHTP_BRANCH: "0.5.x"
+    REPOSITORY_URI: ""
+    
+phases:
+  pre_build:
+    commands:
+      - export REPOSITORY_URI="$(echo $CODEBUILD_BUILD_ARN | cut -f 5 -d ':').dkr.ecr.eu-west-1.amazonaws.com/alpine/suricata"
+      - git clone --depth 1 https://github.com/OISF/libhtp -b ${LIBHTP_BRANCH}
+      - |
+          cd suricata-update
+          curl -L \
+              https://github.com/OISF/suricata-update/archive/master.tar.gz | \
+              tar zxvf - --strip-components=1
+      - cd ..
+  build:
+    commands:
+      - docker build -t ${REPOSITORY_URI}:latest .
+      - export SURICATA_VERSION="$(docker run --entrypoint="/usr/bin/suricata" ${REPOSITORY_URI}:latest -V | awk '{print $5}')"
+      - docker tag ${REPOSITORY_URI}:latest "${REPOSITORY_URI}:${SURICATA_VERSION}"
+  post_build:
+    commands:
+      - docker save --output suricata-docker-save.tar ${REPOSITORY_URI}:latest "${REPOSITORY_URI}:${SURICATA_VERSION}"
+artifacts:
+  files:
+    - 'qa/buildspec/dockerdeploy.yml'      
+    - 'suricata-docker-save.tar'
+  discard-paths: yes

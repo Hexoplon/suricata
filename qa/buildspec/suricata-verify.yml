@@ -1,0 +1,33 @@
+version: 0.2
+
+env:
+  variables:
+    BUILD_CORES: "4"
+    LIBHTP_BRANCH: "0.5.x"
+    CFLAGS: "-Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function"
+    EXTRA_CFLAGS: ""
+    ARGS: "--enable-rust-strict"
+
+phases:
+  pre_build:
+    commands:
+      - export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}" && export BUILD_CORES=$(nproc)
+      - git clone --depth 1 https://github.com/OISF/libhtp -b ${LIBHTP_BRANCH}
+      - |
+          cd suricata-update
+          curl -L \
+              https://github.com/OISF/suricata-update/archive/master.tar.gz | \
+              tar zxvf - --strip-components=1
+      - cd ..
+      - |
+          ./autogen.sh
+          ./configure --enable-unittests \
+                      --enable-lua \
+                      ${ARGS}
+  build:
+    commands:
+      - make -j${BUILD_CORES}
+  post_build:
+    commands:
+      - git clone --depth 1 https://github.com/OISF/suricata-verify.git
+      - python3 ./suricata-verify/run.py
