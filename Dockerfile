@@ -50,6 +50,7 @@ RUN apk add file-dev \
     nss-dev \
     pcre-dev \
     py-yaml \
+    py3-pip \
     python3 \
     rsync \
     yaml-dev
